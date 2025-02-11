@@ -1,0 +1,209 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> Bring UCI and LUCI configuration for Bird4/6 to improve integration with OpenWRT
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:bird-users%40network.cz?Subject=Re%3A%20Bring%20UCI%20and%20LUCI%20configuration%20for%20Bird4/6%20to%20improve%0A%20integration%20with%20OpenWRT&In-Reply-To=%3C20140721122914.EC581FCD2%40mail.crfreenet.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="009180.html">
+   <LINK REL="Next"  HREF="009192.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>Bring UCI and LUCI configuration for Bird4/6 to improve integration with OpenWRT</H1>
+    <B>Ondrej Zajicek</B> 
+    <A HREF="mailto:bird-users%40network.cz?Subject=Re%3A%20Bring%20UCI%20and%20LUCI%20configuration%20for%20Bird4/6%20to%20improve%0A%20integration%20with%20OpenWRT&In-Reply-To=%3C20140721122914.EC581FCD2%40mail.crfreenet.org%3E"
+       TITLE="Bring UCI and LUCI configuration for Bird4/6 to improve integration with OpenWRT">santiago at crfreenet.org
+       </A><BR>
+    <I>Mon Jul 21 14:29:14 CEST 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="009180.html">Bring UCI and LUCI configuration for Bird4/6 to improve integration with OpenWRT
+</A></li>
+        <LI>Next message: <A HREF="009192.html">Bring UCI and LUCI configuration for Bird4/6 to improve integration with OpenWRT
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#9189">[ date ]</a>
+              <a href="thread.html#9189">[ thread ]</a>
+              <a href="subject.html#9189">[ subject ]</a>
+              <a href="author.html#9189">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Sun, Jul 20, 2014 at 12:05:39PM +0200, Eloi Carb&#243; Sol&#233; wrote:
+&gt;<i> Hi everyone,
+</I>&gt;<i> 
+</I>&gt;<i> I am Eloi Carb&#243;, a student from the UPC in Catalonia, doing a Google Summer
+</I>&gt;<i> of Code [0] with the QMP project [1] team, and the support of Guifi.net [2]
+</I>&gt;<i> and BMX6 [3] developers and under the scope of Freifunk [4].
+</I>&gt;<i> 
+</I>&gt;<i> I would like to inform you that we are bringing UCI and LUCI configuration
+</I>&gt;<i> support to Bird4 (now) and Bird6 (ASAP) putting our efforts on BGP routing.
+</I>
+Hello
+
+It would be nice to have UCI configuration in OpenWRT for BIRD. Although
+I am not sure how filters could be usefully represented in UCI and these
+are pretty important in most nontrivial BGP configs.
+
+I would suggest to keep structure of UCI BIRD configs consistent with
+native BIRD configs. Although BIRD sometimes uses multiple nesting and i
+am not sure whether UCI can represent that. Also, please use same option
+names (when possible) with underscore separator for space instead of
+camelCase (e.g. scan_time instead of scanTime). That would be consistent
+with both UCI style and BIRD style.
+
+
+Some comments to /etc/config/bird4:
+
+config bird 'bird'
+    option useUCIconfig '0'
+	#Caution! Enabling this option, Bird will translate this
+	#UCI file and use it instead of /etc/bird4.conf
+    option UCIconfigFile '/tmp/bird4.conf'
+
+Perhaps '/var/etc/bird4.conf' as default ?
+
+
+config global 'global'
+    option logFile '/tmp/bird.log'
+
+Default configuration should probably use syslog instead of logfile.
+
+    option log 'all'
+    option debug 'all'
+
+'debug all' is not a good default value. That would generate tons of log
+messages.
+
+    option table 'arf'
+
+'table' should not be a global option, more like one section for each table
+(although there is just one option 'sorted' and tables currently do not
+have block for options in BIRD config, but that will change in the future).
+
+
+config kernel kernel1
+    option tablePriority '100'
+
+This is misnomer. It is not a table priority, just a kernel table ID.
+
+
+config device device1
+    option scanTime '10'
+    #list primaryIface 'eth0:192.168.1.1'
+    #list primary '192.168.0.0/16'
+
+You may ignore 'primary' device option. It is mostly deprecated and not
+much useful.
+
+
+config bgp bgp1
+    option table 'arf'
+    option import 'all'
+    option export 'all'
+    option as '65001'
+    option disabled '0'
+
+config neighbor
+    option type 'bgp'
+    option instance 'bgp1'
+    option addr '172.16.1.5'
+    option as '65530'
+
+In BIRD, we don't have separate neighbors as subsections of BGP. We have
+one BGP instance per neighbor (also with separate protocol name). UCI
+structure should probably reflect that too. If you want common options
+for multiple BGP neighbors, you could use protocol templates for BGP:
+
+config bgp_template bgp_common
+    option table 'arf'
+    option import 'all'
+    option export 'all'
+    option locas_address '172.16.1.1'
+    option local_as '65001'
+
+config bgp bgp1
+    option template 'bgp_common'
+    option neighbor_address '172.16.1.5'
+    option neighbor_as '65530'
+
+
+config route
+    option instance 'static1'
+    option type 'general'
+    option addr '192.168.9.0/24'
+    list via '10.99.105.159'
+
+Perhaps not use 'list' but 'option' for 'via' in this case.
+Type should be 'router' which should be default type.
+
+option 'addr' should be named 'prefix' instead.
+
+
+config route 
+    option instance 'static1'
+    option type 'special'
+    option addr '192.168.2.0/24'
+    option attribute 'unreachable'
+
+It is unnecessary to use separate 'attribute' option. You could use
+'unreachable', 'blackhole' and 'prohibit' as route types.
+
+
+config route
+    option instance 'static1'
+    option type 'multipath'
+    option addr '192.168.30.0/24'
+    list via '172.16.1.5'
+    list via '172.16.1.6'
+    list viaWeight '172.16.1.2:70'
+
+Weight attribute is probably not important enough to implement it with
+such ugly syntax.
+
+
+For /etc/init.d/bird4, please use 'case' instead of 'if/elif' sequences.
+
+
+-- 
+Elen sila lumenn' omentielvo
+
+Ondrej 'Santiago' Zajicek (email: <A HREF="http://trubka.network.cz/mailman/listinfo/bird-users">santiago at crfreenet.org</A>)
+OpenPGP encrypted e-mails preferred (KeyID 0x11DEADC3, wwwkeys.pgp.net)
+&quot;To err is human -- to blame it on a computer is even more so.&quot;
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: &lt;<A HREF="http://trubka.network.cz/pipermail/bird-users/attachments/20140721/f2f15eef/attachment-0001.asc">http://trubka.network.cz/pipermail/bird-users/attachments/20140721/f2f15eef/attachment-0001.asc</A>&gt;
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="009180.html">Bring UCI and LUCI configuration for Bird4/6 to improve integration with OpenWRT
+</A></li>
+	<LI>Next message: <A HREF="009192.html">Bring UCI and LUCI configuration for Bird4/6 to improve integration with OpenWRT
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#9189">[ date ]</a>
+              <a href="thread.html#9189">[ thread ]</a>
+              <a href="subject.html#9189">[ subject ]</a>
+              <a href="author.html#9189">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://trubka.network.cz/mailman/listinfo/bird-users">More information about the Bird-users
+mailing list</a><br>
+</body></html>

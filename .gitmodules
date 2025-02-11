@@ -1,0 +1,9 @@
+[submodule "asuswrt"]
+	path = asuswrt
+	url = git@github.com:rtsmith134/asuswrt-rt-ac58u
+[submodule "libreoffice2git"]
+	path = libreoffice2git
+	url = https://github.com/timwiel/libreoffice2git.git
+[submodule "Asuswrt-Merlin-Toolchains-Docker"]
+	path = Asuswrt-Merlin-Toolchains-Docker
+	url = git@github.com:gnuton/Asuswrt-Merlin-Toolchains-Docker.git
